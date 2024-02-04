@@ -6,7 +6,8 @@ Description: Simple script for running the expert mode encoder (vvencFFapp) in o
              to have 16-bit depth and keep the correct settings
 
              Right now -- works with vvencapp but not vvencFFapp because of the way im
-             running cmake, not sure what I need to change I'm trying to figure it out
+             running cmake to initially build the project, not sure what I need to change
+             I'm trying to figure it out
 """
 import subprocess
 

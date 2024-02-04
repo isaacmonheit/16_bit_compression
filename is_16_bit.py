@@ -15,7 +15,7 @@ def is_16bit_image(image_path):
         return False
 
 # Example usage:
-image_path = 'capture/neutrino_capture200.png'
+image_path = 'compressed_images/neutrino_capture100.png'
 result = is_16bit_image(image_path)
 yes_or_no = "Indeed" if result else "Nah"
 print(f"Is {image_path} a 16-bit image? {yes_or_no}")
