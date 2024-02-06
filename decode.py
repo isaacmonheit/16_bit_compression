@@ -18,8 +18,6 @@ import shutil
 import os
 
 def decode(input_file, output_folder):
-    if not os.path.exists(output_folder):
-        os.makedirs(output_folder)
     shutil.copy(input_file, output_folder)
 
 if __name__ == "__main__":
