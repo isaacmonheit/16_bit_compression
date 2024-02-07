@@ -30,7 +30,7 @@ def compress_image(input_image_path, output_folder, compression_ratio=10):
     print(f"Target bitrate: {target_bitrate} kbps")
 
     # Construct the output file path
-    output_file_path = os.path.join(output_folder, os.path.basename(input_image_path)[:-4] + "_compressed.png")
+    output_file_path = os.path.join(output_folder, os.path.basename(input_image_path)[:-10] + "_compressed.png")
 
     """ Goal for a basic FFmpeg command:  ffmpeg -i <input> -c:v vvc -b:v 2600k -preset faster <output> """
 
@@ -67,57 +67,87 @@ def encode(input_file, output_folder):
     lower_byte = (image & 0xFF).astype(np.uint8)
 
     # Create a new folder for encoded images
-    encoded_folder = output_folder
-    i = 0
-    while os.path.exists(os.path.join(encoded_folder, f"encoded_{i}")):
-        i += 1
-    encoded_folder = os.path.join(encoded_folder, f"encoded_{i}")
-    os.makedirs(encoded_folder)
+    # encoded_folder = output_folder
+    # i = 0
+    # while os.path.exists(os.path.join(encoded_folder, f"encoded_{i}")):
+    #     i += 1
+    # encoded_folder = os.path.join(encoded_folder, f"encoded_{i}")
+    # os.makedirs(encoded_folder)
 
     # Save upper and lower bytes by replacing the .png with _upper.png and _lower.png
     # NOTE THAT THIS ASSUMES THE INPUT FILE IS A .png
     # NEED TO FIX THIS TO WORK WITH OTHER FILE TYPES
-    upper_byte_path = os.path.join(encoded_folder, os.path.basename(input_file)[:-4] + "_upper.png")
-    lower_byte_path = os.path.join(encoded_folder, os.path.basename(input_file)[:-4] + "_lower.png")
+    upper_byte_path = os.path.join(output_folder, "MSB", os.path.basename(input_file)[:-4] + "_upper.png")
+    lower_byte_path = os.path.join(output_folder, "LSB", os.path.basename(input_file)[:-4] + "_lower.png")
 
     cv2.imwrite(upper_byte_path, upper_byte.reshape((height, width)))
     cv2.imwrite(lower_byte_path, lower_byte.reshape((height, width)))
 
-    compressed_upper_byte_path = compress_image(upper_byte_path, encoded_folder)
-    compressed_lower_byte_path = compress_image(lower_byte_path, encoded_folder)
+
+
 
 
 
     # print what folder the compressed images are in
-    print("The compressed images are in", encoded_folder)
+    # print("The compressed images are in", output_folder)
 
-    #print size of compressed files
-    compressed_upper_byte_size = os.path.getsize(compressed_upper_byte_path)
-    compressed_lower_byte_size = os.path.getsize(compressed_lower_byte_path)
-    print(f"the LSB compressed size is {compressed_lower_byte_size / 1024:.2f} kB")
-    print(f"the MSB compressed size is {compressed_upper_byte_size / 1024:.2f} kB")
+    # print size of compressed files
+    # compressed_upper_byte_size = os.path.getsize(compressed_upper_byte_path)
+    # compressed_lower_byte_size = os.path.getsize(compressed_lower_byte_path)
+    # print(f"the LSB compressed size is {compressed_lower_byte_size / 1024:.2f} kB")
+    # print(f"the MSB compressed size is {compressed_upper_byte_size / 1024:.2f} kB")
 
     #print size of input file and compression ratio for both files combined
-    compressed_file_size = compressed_upper_byte_size + compressed_lower_byte_size
-    print(f"the total compressed file size is {compressed_file_size / 1024:.2f} kB")
-    print(f"the compression ratio is {(input_file_size / compressed_file_size):.2f}x")
+    # compressed_file_size = compressed_upper_byte_size + compressed_lower_byte_size
+    # print(f"the total compressed file size is {compressed_file_size / 1024:.2f} kB")
+    # print(f"the compression ratio is {(input_file_size / compressed_file_size):.2f}x")
+
+
+def encode_folder(source_folder, target_folder):
+    # put all files in the source folder into list to be encoded
+    files = [f for f in os.listdir(source_folder) if f.endswith('.png')]
+    files.sort()
+
+    # create two folders in target folder to hold the encoded images, one called LSB and the other MSB
+    LSB = os.path.join(target_folder, "LSB")
+    MSB = os.path.join(target_folder, "MSB")
+    os.makedirs(LSB, exist_ok=True)
+    os.makedirs(MSB, exist_ok=True)
+
+    for filename in files:
+        input_file_path = os.path.join(source_folder, filename)
+        if is_16bit_image(input_file_path):  # Implement this check based on your requirements
+            encode(input_file_path, target_folder)
+
+
+
+    # run compress_image on LSB and MSB
+    # compressed_upper_byte_path = compress_image(MSB, target_folder)
+    # compressed_lower_byte_path = compress_image(LSB, target_folder)
+
+    # compressed_upper_byte_path = compress_image(upper_byte_path, encoded_folder)
+    # compressed_lower_byte_path = compress_image(lower_byte_path, encoded_folder)
+
 
 if __name__ == "__main__":
     try:
         if len(sys.argv) == 3:            
             # Check if input file exists
-            if not os.path.isfile(sys.argv[1]):
-                print("Error: Input file does not exist.")
+            if not os.path.exists(sys.argv[1]):
+                print("Error: Input folder does not exist.")
                 sys.exit(1)
             
             # Check if output folder exists
             if not os.path.exists(sys.argv[2]):
                 print("Error: Output folder does not exist.")
                 sys.exit(1) 
+
+            encode_folder(sys.argv[1], sys.argv[2])
         else:
-            print("Expected 2 arguments (input_file and output_folder), got", len(sys.argv) - 1)
+            print("Expected 2 arguments (input_folder and output_folder), got", len(sys.argv) - 1)
     except:
-        print("Error: Invalid arguments. Usage: python encode.py <input_file> <output_folder>")
+        print("Error: Something has gone wrong. Usage: python encode.py <input_file> <output_folder>")
+        print(sys.exc_info()[0])
         sys.exit(1)
 
-    encode(sys.argv[1], sys.argv[2])
+    

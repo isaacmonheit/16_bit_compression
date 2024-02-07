@@ -159,6 +159,16 @@ def decode(input_folder, output_folder):
     cv2.destroyAllWindows()
 
 
+"""General flow for decoding video"""
+# def decode_folder(source_folder, target_folder):
+#     # This assumes encoded files are in pairs and named consistently
+#     for filename in os.listdir(source_folder):
+#         if is_lower_byte_file(filename):  # Implement this check
+#             # Deduce upper byte filename based on naming convention
+#             upper_byte_filename = get_upper_byte_filename(filename)
+#             input_folder = source_folder  # Both files are in the same source folder
+#             decode(input_folder, target_folder)
+
 
 if __name__ == "__main__":
     try:
@@ -177,5 +187,6 @@ if __name__ == "__main__":
         else:
             print("Expected 2 arguemnts (input_folder and output_folder), got", len(sys.argv) - 1)
     except:
-        print("Error: Invalid arguments. Usage: python encode.py <input_folder> <output_folder>")
+        print("Error: Something has gone wrong. Usage: python encode.py <input_folder> <output_folder>")
+        print(sys.exc_info()[0])
         sys.exit(1)
