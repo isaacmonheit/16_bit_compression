@@ -158,6 +158,12 @@ def decode(input_folder, output_folder):
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
+def decode_video (input_folder, output_folder):
+    # get the list of video files in the input folder
+    video_files = [f for f in os.listdir(input_folder) if f.endswith('.mp4')]
+    
+    
+
 
 """General flow for decoding video"""
 # def decode_folder(source_folder, target_folder):
