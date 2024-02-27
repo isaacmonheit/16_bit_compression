@@ -1,0 +1,2 @@
+ffmpeg -framerate 30 -i video_test5/LSB/neutrino_capture%d_lower.png -c:v vvc -preset 0 -qp 16 video_test5/LSB.mp4
+ffmpeg -framerate 30 -i video_test5/MSB/neutrino_capture%d_upper.png -c:v jpeg2000 -format j2k -pred 1 -prog 0 video_test5/MSB.mkv

@@ -21,160 +21,118 @@ import subprocess
 
 from is_16_bit import is_16bit_image
 
-def decompress_image(input_compressed_folder_path, output_folder):
+def decode_video (input_folder, output_folder):
 
-    # get both the upper and lower from input folder
-    data_files = [f for f in os.listdir(input_compressed_folder_path) if f.endswith('.png')]
-    data_files.sort()  # Ensure lower byte file is first
+    # get the list of video files in the input folder if it ends with mp4 or mkv
+    video_files = [f for f in os.listdir(input_folder) if f.endswith('.mkv') or f.endswith('.mp4')]
 
-    if len(data_files) != 2:
-        print("Error: The input folder should contain exactly two data files.")
-        sys.exit(1)
-
-    # create new folder in output folder to hold both decompressed images and copy the pngs to the new folder
-    decoded_folder = output_folder
-    i = 0
-    while os.path.exists(os.path.join(decoded_folder, f'decoded_{i}')):
-        i += 1
-    decoded_folder = os.path.join(decoded_folder, f'decoded_{i}')
-    os.makedirs(decoded_folder, exist_ok=True)
-    
-    for file in data_files:
-        input_file_path = os.path.join(input_compressed_folder_path, file)
-        output_file_path = os.path.join(decoded_folder, file.replace('_compressed', ''))
+    # for each video split it into 8-bit frames and save them to {output_folder}/{video_name}
+    for file in video_files:
+        input_file_path = os.path.join(input_folder, file)
+        output_file_path = os.path.join(output_folder, file[:-4])
+        os.makedirs(output_file_path, exist_ok=True)
 
         command = [
             'ffmpeg',
             '-i', input_file_path,
             '-c:v', 'png',
             '-pix_fmt', 'gray',
-            '-update', '1',
-            output_file_path
+            os.path.join(output_file_path, 'frame_%d.png')
         ]
         subprocess.run(command)
-
-    return decoded_folder
-
-def decode(input_folder, output_folder):
- 
-    decompressed_8bits = decompress_image(input_folder, output_folder)
-    print(decompressed_8bits)
-
-    # Get the list of data files in the folder
-    data_files = [f for f in os.listdir(decompressed_8bits) if f.endswith('.png')]
-    data_files.sort()  # Ensure lower byte file is first
-
-    # Check if there are exactly two data files
-    if len(data_files) != 2:
-        print("Error: The decompressed input folder should contain exactly two data files.")
-        return
     
-    # convert the pngs to 8-bit arrays
-    lower_byte = cv2.imread(os.path.join(decompressed_8bits, data_files[0]), cv2.IMREAD_UNCHANGED)
-    upper_byte = cv2.imread(os.path.join(decompressed_8bits, data_files[1]), cv2.IMREAD_UNCHANGED)
+    # get the number of files in LSB folder
+    output_file_path = os.path.join(output_folder, 'LSB')
+    num_files = len([f for f in os.listdir(output_file_path) if f.endswith('.png')])
 
-    # print the size of the lower and upper byte files as well as dimensions
-    lower_byte_size = os.path.getsize(os.path.join(decompressed_8bits, data_files[0]))
-    upper_byte_size = os.path.getsize(os.path.join(decompressed_8bits, data_files[1]))
-    print(f"the LSB decompressed size is {lower_byte_size / 1024:.2f} kB")
-    print(f"the MSB decompressed size is {upper_byte_size / 1024:.2f} kB")
-    
-    # Check if the data was successfully read
-    if lower_byte is None or upper_byte is None:
-        print("Error: Failed to read one or both of the data files.")
-        return
-        
+    os.makedirs(os.path.join(output_folder, 'reconstructed_images'), exist_ok=True)
 
-    # Combine the two 8-bit streams into one 16-bit stream
-    height, width = 512, 640
-    combined_image = (upper_byte.astype(np.uint16) << 8) | lower_byte.astype(np.uint16)
-    
-    # Reshape the combined array back to its original image shape
-    combined_image = combined_image.reshape((height, width))
-    output_file_path = os.path.join(output_folder, 'reconstructed_image.png')
-    cv2.imwrite(output_file_path, combined_image)
+    # take each frame in both folders and combine them into a 16-bit image and save it to {output_folder}/{video_name}
+    for i in range(1, num_files + 1):
+        # loop through all the files in output_folder/LSB and output_folder/MSB and combine them into a 16-bit image starting with frame_1.png
+        lower_byte = cv2.imread(os.path.join(output_folder, 'LSB', f'frame_{i}.png'), cv2.IMREAD_UNCHANGED)
+        upper_byte = cv2.imread(os.path.join(output_folder, 'MSB', f'frame_{i}.png'), cv2.IMREAD_UNCHANGED)
 
-    if not is_16bit_image(output_file_path):
-        print("Error: Output image is not 16-bit depth.")
-        sys.exit(1)
+        # combine the two 8-bit streams into one 16-bit stream
+        height, width = 512, 640
+        combined_image = (upper_byte.astype(np.uint16) << 8) | lower_byte.astype(np.uint16)
 
-    print(f"Reconstructed image saved to {output_file_path}")
-
-    # normalize the image in 8-bit
-    img = cv2.imread(output_file_path, cv2.IMREAD_UNCHANGED)
-    img_normalized = cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
-
-    # compare to original image
-    img_original = cv2.imread('uncompressed_images/neutrino_capture100.png', cv2.IMREAD_UNCHANGED)
-    img_original_normalized = cv2.normalize(img_original, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
-
-    # apply CLAHE enhancement to the image
-    clahe = cv2.createCLAHE(clipLimit=2000.0, tileGridSize=(16, 12))
-    img_enhanced = clahe.apply(img)
-    img_enhanced_normalized = cv2.normalize(img_enhanced, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
-
-    img_original_enhanced = clahe.apply(img_original)
-    img_original_enhanced_normalized = cv2.normalize(img_original_enhanced, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)   
-
-    # cv2.imshow('enhanced Image', clahe.apply(img_original))
+        # reshape the combined array back to its original image shape and place in new folder within output_folder called "reconstructed_images"
+        combined_image = combined_image.reshape((height, width))
+        output_file_path = os.path.join(output_folder, 'reconstructed_images', f'reconstructed_frame_{i}.png')
+        cv2.imwrite(output_file_path, combined_image)
 
 
+    #compare the reconstructed images to the original images
+    pic_num = int(input("Enter the number of the picture you would like to compare (1-300): "))
+    for i in range(pic_num, pic_num + 1):
+        # load the original image and the reconstructed image
+        img = cv2.imread(os.path.join(output_folder, 'reconstructed_images', f'reconstructed_frame_{i}.png'), cv2.IMREAD_UNCHANGED)
+        img_original = cv2.imread(f'capture/neutrino_capture{i - 1}.png', cv2.IMREAD_UNCHANGED)
 
-    img_size = os.path.getsize(output_file_path)
-    img_original_size = os.path.getsize('uncompressed_images/neutrino_capture100.png')
-    
-    # find the path of both compressed images in the input_folder
-    compressed_files = [f for f in os.listdir(input_folder) if f.endswith('.png')]
-    compressed_files.sort()
-    compressed_files = [os.path.join(input_folder, f) for f in compressed_files]
+        # normalize the images
+        img_normalized = cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
+        img_original_normalized = cv2.normalize(img_original, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
 
-    # create variable input_file_size to store the combined size of both the upper and lower byte files in the input_folder
-    input_file_size = 0
-    for file in compressed_files:
-        input_file_size += os.path.getsize(file)
-    
+        # apply CLAHE enhancement to the images
+        clahe = cv2.createCLAHE(clipLimit=2000.0, tileGridSize=(16, 12))
+        img_enhanced = clahe.apply(img)
+        img_enhanced_normalized = cv2.normalize(img_enhanced, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
 
-    # create a 4 panel image display to compare the original and reconstructed images as well as the CLAHE enhanced images of both adding a space and title for each
-    img_display = np.zeros((1024, 1280), dtype=np.uint8)
-    img_display[:512, :640] = img_original_normalized
-    img_display[:512, 640:] = img_normalized
-    img_display[512:, :640] = clahe.apply(img_original_enhanced_normalized)
-    img_display[512:, 640:] = img_enhanced_normalized
-    cv2.putText(img_display, 'Original Image', (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
-    cv2.putText(img_display, 'Reconstructed Image', (650, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
-    cv2.putText(img_display, 'Original Enhanced Image', (10, 540), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
-    cv2.putText(img_display, 'Reconstructed Enhanced Image', (650, 540), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
-    cv2.imshow('Comparison', img_display)
+        img_original_enhanced = clahe.apply(img_original)
+        img_original_enhanced_normalized = cv2.normalize(img_original_enhanced, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)   
 
-    # IMPORTANT INFORMATION
-    print(f'the size of the original image is {img_original_size / 1024:.2f} kB')
-    print(f'the size of the reconstructed image is {img_size / 1024:.2f} kB')
-    print(f'the size of the input folder is {input_file_size / 1024:.2f} kB')
-    difference = cv2.subtract(img, img_original)
-    print(f'the percentage of difference between the original and reconstructed images is: {cv2.countNonZero(difference) / (512 * 640) * 100:.2f}%')
-    print(f'the compression ratio is: {(img_original_size / input_file_size):.2f}x')
-    print("the resultant image is 16-bit" if is_16bit_image(output_file_path) else "the resultant image is not 16-bit")
+        # create a 4 panel image display to compare the original and reconstructed images as well as the CLAHE enhanced images of both adding a space and title for each
+        img_display = np.zeros((1024, 1280), dtype=np.uint8)
+        img_display[:512, :640] = img_original_normalized
+        img_display[:512, 640:] = img_normalized
+        img_display[512:, :640] = clahe.apply(img_original_enhanced_normalized)
+        img_display[512:, 640:] = img_enhanced_normalized
+        cv2.putText(img_display, 'Original Image', (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+        cv2.putText(img_display, 'Reconstructed Image', (650, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+        cv2.putText(img_display, 'Original Enhanced Image', (10, 540), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+        cv2.putText(img_display, 'Reconstructed Enhanced Image', (650, 540), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+        cv2.imshow('Comparison', img_display)
 
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+        print(f"\nComplete video information ({input_folder}/{output_folder}):\n")
 
-def decode_video (input_folder, output_folder):
-    # get the list of video files in the input folder
-    video_files = [f for f in os.listdir(input_folder) if f.endswith('.mp4')]
-    
-    
+        # print the command used to compress the video from input_folder/encode_commands.txt line by line with a space between each
+        with open(f"{input_folder}/encode_commands.txt", "r") as file:
+            # print("\tthe command used to compress the video is:")
+            for line in file:
+                print(f"\t{line}", end="")
+
+        print("\n")
+
+        # IMPORTANT INFORMATION -------------------------------------------------
+        # print the size of the folder named "capture"
+        og_folder_size = sum(os.path.getsize(f"capture/{f}") for f in os.listdir("capture") if os.path.isfile(f"capture/{f}"))
+        print(f"\tsize of capture folder (pre compression): {og_folder_size / 1024:.2f}kB")
+
+        # print the size of the input folder
+        input_folder_size = sum(os.path.getsize(f"{input_folder}/{f}") for f in os.listdir(input_folder) if os.path.isfile(f"{input_folder}/{f}"))
+        print(f"\tsize of input folder (post compression): {input_folder_size / 1024:.2f}kB")
+
+        # CR = original size / compressed size
+        print(f"\tcompression ratio: {og_folder_size / input_folder_size:.2f}x")
+
+        # print the size of all elements in the output_folder
+        reconstructed_images_size = 0
+        for file in os.listdir(os.path.join(output_folder, 'reconstructed_images')):
+            reconstructed_images_size += os.path.getsize(os.path.join(output_folder, 'reconstructed_images', file))
+        print(f"\tsize of recontructed images (post decompression) {reconstructed_images_size / 1024:.2f} kB")
 
 
-"""General flow for decoding video"""
-# def decode_folder(source_folder, target_folder):
-#     # This assumes encoded files are in pairs and named consistently
-#     for filename in os.listdir(source_folder):
-#         if is_lower_byte_file(filename):  # Implement this check
-#             # Deduce upper byte filename based on naming convention
-#             upper_byte_filename = get_upper_byte_filename(filename)
-#             input_folder = source_folder  # Both files are in the same source folder
-#             decode(input_folder, target_folder)
+        print("\n-----------------------------------------------------------------------------------------------\n")
+        print("Single image information (neutrino_capture250.png) before and after:\n")
+        print(f'\tthe size of the original image is {os.path.getsize(f"capture/neutrino_capture{i - 1}.png") / 1024:.2f} kB')
+        print(f'\tthe size of the reconstructed image is {os.path.getsize(os.path.join(output_folder, "reconstructed_images", f"reconstructed_frame_{i}.png")) / 1024:.2f} kB')
+        print(f'\tthe percentage of difference between the original and reconstructed images is: {cv2.countNonZero(cv2.subtract(img, img_original)) / (512 * 640) * 100:.2f}%')
+        # print("\tthe resultant image is 16-bit" if is_16bit_image(os.path.join(output_folder, "reconstructed_images", f"reconstructed_frame_{i}.png")) else "the resultant image is not 16-bit")
+        # print("\n")
 
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
 
 if __name__ == "__main__":
     try:
@@ -189,10 +147,10 @@ if __name__ == "__main__":
                 print("Error: Output folder does not exist.")
                 sys.exit(1)
             
-            decode(sys.argv[1], sys.argv[2])
+            decode_video(sys.argv[1], sys.argv[2])
         else:
             print("Expected 2 arguemnts (input_folder and output_folder), got", len(sys.argv) - 1)
     except:
         print("Error: Something has gone wrong. Usage: python encode.py <input_folder> <output_folder>")
-        print(sys.exc_info()[0])
+        print(sys.exc_info())
         sys.exit(1)
