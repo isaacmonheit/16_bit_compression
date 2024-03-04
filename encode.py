@@ -3,15 +3,15 @@ File: encode.py
 Author: Isaac Monheit
 Date: 2/4/24
 Description: 
-            Compress the input file using Bit Stream Splitting (BSS) 
-            and save it to the output folder.
+            Compresses an input video (taken in as a folder of frames) using Bit Stream Splitting (BSS) 
+            and saves the compressed LSB and MSB videos to the output folder.
 
             Args:
-                input_image_path (str): Path to the input image file.
-                output_folder (str): Path to the output folder.
+                input_folder_path (str): Path to the input folder.
+                output_folder_path (str): Path to the output folder.
 
             Usage:
-                python3 encode.py <input_image_path> <output_folder>
+                python3 encode.py <input_folder_path> <output_folder_path>
 """
 
 import sys
@@ -20,7 +20,7 @@ import os
 import numpy as np
 import subprocess
 
-from is_16_bit import is_16bit_image
+from other_scripts.is_16_bit import is_16bit_image
 
 def encode(input_file, output_folder):
     if not is_16bit_image(input_file):
@@ -65,10 +65,13 @@ def encode_folder(source_folder, target_folder):
     # -c vvc (after ...d_lower.png) : to use the VVC codec, much slower but insane CR (43x to 266x)
     # data for -c:v vvc is in test3 folders
         
-    # most optimal right now, using vvc
-    LSB_command = f"ffmpeg -framerate 30 -i {LSB}/neutrino_capture%d_lower.png -c:v vvc -preset 0 -qp 22 {target_folder}/LSB.mp4"
-    
-    # this one works well but loses a fair bit of quality
+    # most optimal right now, using vvc, but wierd white spots that I cant seem to get rid of
+    # LSB_command = f"ffmpeg -framerate 30 -i {LSB}/neutrino_capture%d_lower.png -c:v vvc -preset 0 -qp 8 -bitdepth8 true -levelidc 0 -tier main {target_folder}/LSB.mp4"
+
+    # this one works well but loses a fair bit of quality (#1 option rn)
+    LSB_command = f"ffmpeg -framerate 30 -i {LSB}/neutrino_capture%d_lower.png -b:v 8M {target_folder}/LSB.mp4"
+
+    # working to improve the one above
     # LSB_command = f"ffmpeg -framerate 30 -i {LSB}/neutrino_capture%d_lower.png -b:v 8M {target_folder}/LSB.mkv"
 
     # j2k removes metadata, jp2 keeps it
@@ -136,7 +139,7 @@ if __name__ == "__main__":
         else:
             print("Expected 2 arguments (input_folder and output_folder), got", len(sys.argv) - 1)
     except:
-        print("Error: Something has gone wrong. Usage: python encode.py <input_file> <output_folder>")
+        print("Error: Something has gone wrong. Usage: python encode.py <input_folder_path> <output_folder_path>")
         print(sys.exc_info()[0])
         sys.exit(1)
 

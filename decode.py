@@ -3,14 +3,16 @@ File: decode.py
 Author: Isaac Monheit
 Date: 2/4/24
 Description: 
-            Decompress a BSS compressed image and save it to the output folder.
+            Decompresses a BSS compressed video, stored in  and save it to the output folder.
 
             Args:
-                input_compressed_folder_path (str): Path to the input compressed folder.
-                output_folder (str): Path to the output folder.
+                input_folder_path (str): Path to the input compressed folder
+                                                        Input folder contains two videos, one called "LSB.mp4" and the other called "MSB.mkv"
+                                                        and also an encode_commands.txt file that contains the commands used to compress each video
+                output_folder_path (str): Path to the output folder.
 
-            Returns:
-                str: Path to the decoded folder.
+            Usage:
+                python3 decode.py <input_folder_path> <output_folder_path>
 """
 
 import sys
@@ -19,7 +21,7 @@ import numpy as np
 import os
 import subprocess
 
-from is_16_bit import is_16bit_image
+from other_scripts.is_16_bit import is_16bit_image
 
 def decode_video (input_folder, output_folder):
 
@@ -37,6 +39,7 @@ def decode_video (input_folder, output_folder):
             '-i', input_file_path,
             '-c:v', 'png',
             '-pix_fmt', 'gray',
+            '-start_number', '0',
             os.path.join(output_file_path, 'frame_%d.png')
         ]
         subprocess.run(command)
@@ -48,7 +51,7 @@ def decode_video (input_folder, output_folder):
     os.makedirs(os.path.join(output_folder, 'reconstructed_images'), exist_ok=True)
 
     # take each frame in both folders and combine them into a 16-bit image and save it to {output_folder}/{video_name}
-    for i in range(1, num_files + 1):
+    for i in range(0, num_files):
         # loop through all the files in output_folder/LSB and output_folder/MSB and combine them into a 16-bit image starting with frame_1.png
         lower_byte = cv2.imread(os.path.join(output_folder, 'LSB', f'frame_{i}.png'), cv2.IMREAD_UNCHANGED)
         upper_byte = cv2.imread(os.path.join(output_folder, 'MSB', f'frame_{i}.png'), cv2.IMREAD_UNCHANGED)
@@ -64,11 +67,11 @@ def decode_video (input_folder, output_folder):
 
 
     #compare the reconstructed images to the original images
-    pic_num = int(input("Enter the number of the picture you would like to compare (1-300): "))
+    pic_num = int(input("Enter the number of the picture you would like to compare (0-299): "))
     for i in range(pic_num, pic_num + 1):
         # load the original image and the reconstructed image
         img = cv2.imread(os.path.join(output_folder, 'reconstructed_images', f'reconstructed_frame_{i}.png'), cv2.IMREAD_UNCHANGED)
-        img_original = cv2.imread(f'capture/neutrino_capture{i - 1}.png', cv2.IMREAD_UNCHANGED)
+        img_original = cv2.imread(f'capture/neutrino_capture{i}.png', cv2.IMREAD_UNCHANGED)
 
         # normalize the images
         img_normalized = cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
@@ -124,8 +127,8 @@ def decode_video (input_folder, output_folder):
 
 
         print("\n-----------------------------------------------------------------------------------------------\n")
-        print("Single image information (neutrino_capture250.png) before and after:\n")
-        print(f'\tthe size of the original image is {os.path.getsize(f"capture/neutrino_capture{i - 1}.png") / 1024:.2f} kB')
+        print(f"Single image information (neutrino_capture{i}.png) before and after:\n")
+        print(f'\tthe size of the original image is {os.path.getsize(f"capture/neutrino_capture{i}.png") / 1024:.2f} kB')
         print(f'\tthe size of the reconstructed image is {os.path.getsize(os.path.join(output_folder, "reconstructed_images", f"reconstructed_frame_{i}.png")) / 1024:.2f} kB')
         print(f'\tthe percentage of difference between the original and reconstructed images is: {cv2.countNonZero(cv2.subtract(img, img_original)) / (512 * 640) * 100:.2f}%')
         # print("\tthe resultant image is 16-bit" if is_16bit_image(os.path.join(output_folder, "reconstructed_images", f"reconstructed_frame_{i}.png")) else "the resultant image is not 16-bit")
@@ -149,8 +152,8 @@ if __name__ == "__main__":
             
             decode_video(sys.argv[1], sys.argv[2])
         else:
-            print("Expected 2 arguemnts (input_folder and output_folder), got", len(sys.argv) - 1)
+            print("Expected 2 arguments (input_folder_path and output_folder_path), got", len(sys.argv) - 1)
     except:
-        print("Error: Something has gone wrong. Usage: python encode.py <input_folder> <output_folder>")
+        print("Error: Something has gone wrong. Usage: python encode.py <input_folder_path> <output_folder_path>")
         print(sys.exc_info())
         sys.exit(1)
