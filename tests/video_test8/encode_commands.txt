@@ -1,0 +1,2 @@
+ffmpeg -framerate 30 -i tests/video_test8/LSB/neutrino_capture%d_lower.png -c:v libx265 -crf 0 -preset veryfast tests/video_test8/LSB.mp4
+ffmpeg -framerate 30 -i tests/video_test8/MSB/neutrino_capture%d_upper.png -c:v jpeg2000 -format j2k -pred 1 -prog 0 tests/video_test8/MSB.mkv

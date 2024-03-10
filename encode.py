@@ -69,10 +69,16 @@ def encode_folder(source_folder, target_folder):
     # LSB_command = f"ffmpeg -framerate 30 -i {LSB}/neutrino_capture%d_lower.png -c:v vvc -preset 0 -qp 8 -bitdepth8 true -levelidc 0 -tier main {target_folder}/LSB.mp4"
 
     # this one works well but loses a fair bit of quality (#1 option rn)
-    LSB_command = f"ffmpeg -framerate 30 -i {LSB}/neutrino_capture%d_lower.png -b:v 8M {target_folder}/LSB.mp4"
+    # LSB_command = f"ffmpeg -framerate 30 -i {LSB}/neutrino_capture%d_lower.png -b:v 8M {target_folder}/LSB.mp4"
+            
+    LSB_command = f"ffmpeg -framerate 30 -i {LSB}/neutrino_capture%d_lower.png -c:v libx265 -crf 0 -preset veryfast {target_folder}/LSB.mp4"
 
     # working to improve the one above
-    # LSB_command = f"ffmpeg -framerate 30 -i {LSB}/neutrino_capture%d_lower.png -b:v 8M {target_folder}/LSB.mkv"
+    # First pass (generates a log file for bitrate allocation)
+    # LSB_command_1 = f"ffmpeg -framerate 30 -i {LSB}/neutrino_capture%d_lower.png -c:v libx265 -b:v 8M -x265-params pass=1 -f null /dev/null"
+    # Second pass (uses the log file to encode the video efficiently)
+    # LSB_command_2 = f"ffmpeg -framerate 30 -i {LSB}/neutrino_capture%d_lower.png -c:v libx265 -b:v 8M -x265-params pass=2  {target_folder}/LSB.mp4"
+
 
     # j2k removes metadata, jp2 keeps it
     MSB_command = f"ffmpeg -framerate 30 -i {MSB}/neutrino_capture%d_upper.png -c:v jpeg2000 -format j2k -pred 1 -prog 0 {target_folder}/MSB.mkv"
